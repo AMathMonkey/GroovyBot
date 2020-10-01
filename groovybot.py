@@ -90,8 +90,6 @@ def get_points_leaders():
                 runs_mini.append(
                     {'category': category, 'level': level, 'name': name, 'time': time_string(time), 'place': place})
 
-    json.dump(runs_mini, open('runs.json', 'w'), indent=2)
-
     ranking = sorted(player_scores, key=player_scores.get, reverse=True)
     new_runs_string = '```\n'
     message_string = '```\n'
@@ -114,9 +112,13 @@ def get_points_leaders():
             t.add_row([make_ordinal(pos), player_scores[name], name])
             prev_pos = pos
             prev_score = player_scores[name]
-    message_string += str(t) + '\n'
-    message_string += '```'
+
+    message_string += str(t) + '\n' + '```'
     new_runs_string += '```'
+
+    if len(new_runs_string) > 7:
+        json.dump(runs_mini, open('runs.json', 'w'), indent=2)
+
     return new_runs_string, message_string
 
 
@@ -137,7 +139,6 @@ async def my_background_task():
         if are_new_runs:
             print("New run(s)")
             message_to_send += new_runs
-            # await channel.send(new_runs + '\n')
             # print(new_runs + '\n')
         else:
             print("No new runs")
@@ -147,7 +148,6 @@ async def my_background_task():
         if msg != rankings.read():
             print("Point Rankings Update")
             message_to_send += '```Point Rankings Update!```' + msg
-            # await channel.send('```Point Rankings Update!```\n' + msg)
             # print('Point Rankings Update!\n' + msg)
             rankings.seek(0)
             rankings.truncate()
@@ -155,7 +155,6 @@ async def my_background_task():
         else:
             if are_new_runs:
                 message_to_send += '```But rankings are unchanged```'
-                # await channel.send('```But rankings are unchanged```')
                 # print('But rankings are unchanged')
             print("No Update")
 

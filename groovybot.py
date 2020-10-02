@@ -64,8 +64,8 @@ def time_string(time):
 
 def get_points_leaders():
     bar_runs = {}
-    runs_mini = []
-    old_runs_mini = json.load(open('runs.json', 'r'))
+    runs_mini = {}  # list of only important data about each run to be scraped and saved
+    old_runs_mini = set(json.load(open('runs.json', 'r')))
 
     for category in game.categories:
         if category.type == 'per-level':
@@ -87,8 +87,9 @@ def get_points_leaders():
                     player_scores[name] = 0
                 player_scores[name] += calc_score(place)
 
-                runs_mini.append(
-                    {'category': category, 'level': level, 'name': name, 'time': time_string(time), 'place': place})
+                id_string = category+level+name+time
+                runs_mini[id_string] = {'category': category, 'level': level,
+                                        'name': name, 'time': time_string(time), 'place': place}
 
     ranking = sorted(player_scores, key=player_scores.get, reverse=True)
     new_runs_string = '```\n'
@@ -96,6 +97,7 @@ def get_points_leaders():
 
     for run in runs_mini:
         if not run in old_runs_mini:
+            run = runs_mini[run]
             new_runs_string += f"New run! {run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
 
     t = PrettyTable(['Pos', 'Score', 'Name'])
@@ -117,7 +119,7 @@ def get_points_leaders():
     new_runs_string += '```'
 
     if len(new_runs_string) > 7:
-        json.dump(runs_mini, open('runs.json', 'w'), indent=2)
+        json.dump(list(runs_mini.keys()), open('runs.json', 'w'), indent=2)
 
     return new_runs_string, message_string
 
@@ -159,6 +161,7 @@ async def my_background_task():
             print("No Update")
 
         if len(message_to_send) > 0:
+            # print(message_to_send)
             await channel.send(message_to_send)
         rankings.close()
         await asyncio.sleep(1200)  # task runs every 1200 seconds

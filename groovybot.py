@@ -50,7 +50,7 @@ def time_string(time):
         seconds = time
         hundredths = '00'
     seconds = int(seconds)
-    while seconds > 60:
+    while seconds >= 60:
         minutes += 1
         seconds -= 60
     hundredths = '{:<02s}'.format(hundredths)

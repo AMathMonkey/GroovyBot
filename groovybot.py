@@ -21,8 +21,7 @@ client = discord.Client()
 @client.event
 async def on_ready():
     print(f'{client.user.name} has connected to Discord!')
-    channel = client.get_channel(id=760197170686328842)
-    # await channel.send("Hello World")
+    # channel = client.get_channel(id=760197170686328842)
     client.loop.create_task(my_background_task())
 
 
@@ -62,9 +61,14 @@ def time_string(time):
 #     + "&status=verified&orderby=verify-date&direction=desc")))
 
 
-def get_points_leaders():
+def enclose_in_code_block(string):
+    return '```\n' + string + '\n```'
+
+
+def parse_leaderboards():
     bar_runs = {}
     runs_mini = {}  # list of only important data about each run to be scraped and saved
+    # load a json list and convert to a set
     old_runs_mini = set(json.load(open('runs.json', 'r')))
 
     for category in game.categories:
@@ -92,11 +96,12 @@ def get_points_leaders():
                                         'name': name, 'time': time_string(time), 'place': place}
 
     ranking = sorted(player_scores, key=player_scores.get, reverse=True)
-    new_runs_string = '```\n'
-    message_string = '```\n'
+    new_runs_string = ''
 
-    for run in runs_mini:
-        if not run in old_runs_mini:
+    for run in runs_mini:  # just looks at the keys of this dict, which are run IDs
+        if not run in old_runs_mini:  # if this ID isn't in the set of old IDs, run is new
+
+            # temporarily convert run from an ID string to the actual run with that ID to simplify next line
             run = runs_mini[run]
             new_runs_string += f"New run! {run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
 
@@ -115,16 +120,16 @@ def get_points_leaders():
             prev_pos = pos
             prev_score = player_scores[name]
 
-    message_string += str(t) + '\n' + '```'
-    new_runs_string += '```'
-
-    if len(new_runs_string) > 7:
+    if len(new_runs_string) > 0:
         json.dump(list(runs_mini.keys()), open('runs.json', 'w'), indent=2)
 
-    return new_runs_string, message_string
+    if new_runs_string == '':
+        new_runs_string = None
+
+    return {'new_runs': new_runs_string,
+            'table': str(t)}
 
 
-# def my_background_task():
 async def my_background_task():
 
     await client.wait_until_ready()
@@ -132,42 +137,39 @@ async def my_background_task():
     while True:
         print("Check Leaderboards @ " +
               datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        new_runs, msg = get_points_leaders()
 
-        are_new_runs = len(new_runs) > 7  # that's the length of ```\n```
+        parsed_result = parse_leaderboards()
+        new_runs = parsed_result['new_runs']
+        table = parsed_result['table']
 
         message_to_send = ''
 
-        if are_new_runs:
+        if new_runs != None:
             print("New run(s)")
-            message_to_send += new_runs
-            # print(new_runs + '\n')
+            message_to_send += enclose_in_code_block(new_runs)
         else:
             print("No new runs")
 
         rankings = open("rankings.txt", "r+")
 
-        if msg != rankings.read():
+        if table != rankings.read():
             print("Point Rankings Update")
-            message_to_send += '```Point Rankings Update!```' + msg
-            # print('Point Rankings Update!\n' + msg)
+            message_to_send += enclose_in_code_block(
+                'Point Rankings Update!\n' + table)
             rankings.seek(0)
             rankings.truncate()
-            rankings.write(msg)
+            rankings.write(table)
         else:
-            if are_new_runs:
-                message_to_send += '```But rankings are unchanged```'
-                # print('But rankings are unchanged')
+            if new_runs != None:
+                message_to_send += enclose_in_code_block(
+                    'But rankings are unchanged')
             print("No Update")
 
         if len(message_to_send) > 0:
             # print(message_to_send)
             await channel.send(message_to_send)
         rankings.close()
+        print('sleeping')
         await asyncio.sleep(1200)  # task runs every 1200 seconds
 
-
-# check_new_runs()
 client.run(TOKEN)
-
-# my_background_task()

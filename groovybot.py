@@ -1,4 +1,5 @@
 from datetime import datetime
+from json.decoder import JSONDecodeError
 from dotenv import load_dotenv
 import asyncio
 import discord
@@ -21,7 +22,7 @@ client = discord.Client()
 @client.event
 async def on_ready():
     print(f'{client.user.name} has connected to Discord!')
-    # channel = client.get_channel(id=760197170686328842)
+    channel = client.get_channel(id=760197170686328842)
     client.loop.create_task(my_background_task())
 
 
@@ -137,39 +138,42 @@ async def my_background_task():
     while True:
         print("Check Leaderboards @ " +
               datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        try:
+            parsed_result = parse_leaderboards()
+            new_runs = parsed_result['new_runs']
+            table = parsed_result['table']
 
-        parsed_result = parse_leaderboards()
-        new_runs = parsed_result['new_runs']
-        table = parsed_result['table']
+            message_to_send = ''
 
-        message_to_send = ''
-
-        if new_runs != None:
-            print("New run(s)")
-            message_to_send += enclose_in_code_block(new_runs)
-        else:
-            print("No new runs")
-
-        rankings = open("rankings.txt", "r+")
-
-        if table != rankings.read():
-            print("Point Rankings Update")
-            message_to_send += enclose_in_code_block(
-                'Point Rankings Update!\n' + table)
-            rankings.seek(0)
-            rankings.truncate()
-            rankings.write(table)
-        else:
             if new_runs != None:
-                message_to_send += enclose_in_code_block(
-                    'But rankings are unchanged')
-            print("No Update")
+                print("New run(s)")
+                message_to_send += enclose_in_code_block(new_runs)
+            else:
+                print("No new runs")
 
-        if len(message_to_send) > 0:
-            # print(message_to_send)
-            await channel.send(message_to_send)
-        rankings.close()
-        print('sleeping')
+            rankings = open("rankings.txt", "r+")
+
+            if table != rankings.read():
+                print("Point Rankings Update")
+                message_to_send += enclose_in_code_block(
+                    'Point Rankings Update!\n' + table)
+                rankings.seek(0)
+                rankings.truncate()
+                rankings.write(table)
+            else:
+                if new_runs != None:
+                    message_to_send += enclose_in_code_block(
+                        'But rankings are unchanged')
+                print("No Update")
+
+            if len(message_to_send) > 0:
+                # print(message_to_send)
+                await channel.send(message_to_send)
+            rankings.close()
+            print('sleeping')
+        except JSONDecodeError as e:
+            print('Unexpected API issue')
+            print(e)
         await asyncio.sleep(1200)  # task runs every 1200 seconds
 
 client.run(TOKEN)

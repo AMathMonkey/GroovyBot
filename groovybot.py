@@ -57,11 +57,6 @@ def time_string(time):
     return f"{minutes}:{seconds}.{hundredths}"
 
 
-# def check_new_runs():
-#     print(dt.Run(api, data=api.get("runs?game=" + game.id)))
-#     + "&status=verified&orderby=verify-date&direction=desc")))
-
-
 def enclose_in_code_block(string):
     return "```\n" + string + "\n```"
 
@@ -117,21 +112,22 @@ def get_player_scores(runs_mini):
 
 
 def get_new_runs_string(runs_mini, old_runs_mini):
-    new_runs_string = ""
+    new_runs_string = []
 
     for run in runs_mini:  # just looks at the keys of this dict, which are run IDs
-        if (
-            not run in old_runs_mini
-        ):  # if this ID isn't in the set of old IDs, run is new
+        # if this ID isn't in the set of old IDs, run is new
+        if not run in old_runs_mini:
 
             # temporarily convert run from an ID string to the actual run with that ID to simplify next line
             run = runs_mini[run]
-            new_runs_string += f"New run! {run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
+            new_runs_string.append(
+                f"New run! {run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
+            )
 
-    if new_runs_string == "":
-        new_runs_string = None
+    if not new_runs_string:
+        return None
 
-    return new_runs_string
+    return "".join(new_runs_string)
 
 
 def get_table(player_scores):
@@ -164,9 +160,9 @@ async def my_background_task():
         print("Check Leaderboards @ " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         try:
             bar_runs = get_all_runs()
-            runs_mini = get_runs_mini(
-                bar_runs
-            )  # list of only important data about each run to be scraped and saved
+
+            # list of only important data about each run to be scraped and saved
+            runs_mini = get_runs_mini(bar_runs)
             player_scores = get_player_scores(runs_mini)
             table = get_table(player_scores)
 

@@ -12,6 +12,8 @@ api = srcomapi.SpeedrunCom()
 api.debug = 0
 game = api.search(srcomapi.datatypes.Game, {"name": "Beetle Adventure Racing"})[0]
 
+GROOVYBOT_CHANNEL_ID = 760197170686328842
+
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 bot = commands.Bot("!")
@@ -22,18 +24,38 @@ async def on_ready():
     print(f"{bot.user.name} has connected to Discord!")
 
 
+@bot.command()
+async def ilranking(ctx, username: str, category: str):
+    if ctx.channel.id == GROOVYBOT_CHANNEL_ID:
+        username = username.strip().lower()
+        track_and_category = track_category_converter(category.strip().lower())
+        if not track_and_category:
+            await ctx.send("Invalid command")
+            return
+
+        track = track_and_category["track"]
+        category = track_and_category["category"]
+        print(f"username: {username}, category: {category}")
+
+        runs_mini = json.load(open("runs.json", "r"))
+        for run in runs_mini.values():
+            if run["category"] == category and run["level"] == track and run["name"].lower() == username:
+                message = f"{run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
+                await ctx.send(enclose_in_code_block(message))
+
+
 @tasks.loop(minutes=20.0)
 async def point_rankings_task():
     print("Check Leaderboards @ " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-    channel = bot.get_channel(id=760197170686328842)
+    channel = bot.get_channel(id=GROOVYBOT_CHANNEL_ID)
 
     bar_runs = get_all_runs()
 
     # list of only important data about each run
     runs_mini = get_runs_mini(bar_runs)
     # load a json list and convert to a set
-    old_runs_mini = set(json.load(open("runs.json", "r")))
+    old_runs_mini = json.load(open("runs.json"))
 
     player_scores = get_player_scores(runs_mini)
     table = get_table(player_scores)
@@ -44,7 +66,8 @@ async def point_rankings_task():
     if new_runs_string:
         print("New run(s)")
         message_to_send.append(enclose_in_code_block(new_runs_string))
-        json.dump(list(runs_mini.keys()), open("runs.json", "w"), indent=2)
+
+        json.dump(runs_mini, open("runs.json", "w"), indent=2)
     else:
         print("No new runs")
 
@@ -75,6 +98,30 @@ async def point_rankings_task():
 @point_rankings_task.before_loop
 async def before_point_rankings():
     await bot.wait_until_ready()
+
+
+def track_category_converter(shortform: str):
+    if shortform.endswith("100"):
+        category = "100 points"
+    else:
+        category = "Best track time"
+
+    if shortform.startswith("cc"):
+        track = "Coventry Cove"
+    elif shortform.startswith("mmm"):
+        track = "Mount Mayhem"
+    elif shortform.startswith("ii"):
+        track = "Inferno Isle"
+    elif shortform.startswith("ss"):
+        track = "Sunset Sands"
+    elif shortform.startswith("mms"):
+        track = "Metro Madness"
+    elif shortform.startswith("ww"):
+        track = "Wicked Woods"
+    else:
+        return None
+
+    return {"category": category, "track": track}
 
 
 def calc_score(placing):
@@ -200,6 +247,7 @@ def get_table(player_scores):
             prev_score = player_scores[name]
 
     return str(t)
+
 
 point_rankings_task.add_exception_type(JSONDecodeError)
 point_rankings_task.start()

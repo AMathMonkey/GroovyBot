@@ -1,8 +1,7 @@
 from datetime import datetime
 from json.decoder import JSONDecodeError
 from dotenv import load_dotenv
-import asyncio
-import discord
+from discord.ext import tasks, commands
 import os
 import srcomapi
 import srcomapi.datatypes as dt
@@ -15,14 +14,68 @@ game = api.search(srcomapi.datatypes.Game, {"name": "Beetle Adventure Racing"})[
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
-client = discord.Client()
+bot = commands.Bot("!")
 
 
-@client.event
+@bot.event
 async def on_ready():
-    print(f"{client.user.name} has connected to Discord!")
-    channel = client.get_channel(id=760197170686328842)
-    client.loop.create_task(my_background_task())
+    print(f"{bot.user.name} has connected to Discord!")
+
+
+@tasks.loop(minutes=20.0)
+async def point_rankings_task():
+    print("Check Leaderboards @ " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+    channel = bot.get_channel(id=760197170686328842)
+
+    bar_runs = get_all_runs()
+
+    # list of only important data about each run
+    runs_mini = get_runs_mini(bar_runs)
+    player_scores = get_player_scores(runs_mini)
+    table = get_table(player_scores)
+
+    # load a json list and convert to a set
+    old_runs_mini = set(json.load(open("runs.json", "r")))
+
+    new_runs_string = get_new_runs_string(runs_mini, old_runs_mini)
+
+    message_to_send = []
+
+    if new_runs_string != None:
+        print("New run(s)")
+        message_to_send.append(enclose_in_code_block(new_runs_string))
+        json.dump(list(runs_mini.keys()), open("runs.json", "w"), indent=2)
+    else:
+        print("No new runs")
+
+    with open("rankings.txt", "r+") as rankings:
+        if table != rankings.read():
+            print("Point Rankings Update")
+            message_to_send.append(
+                enclose_in_code_block("Point Rankings Update!\n" + table)
+            )
+            rankings.seek(0)
+            rankings.truncate()
+            rankings.write(table)
+        else:
+            if new_runs_string != None:
+                message_to_send.append(
+                    enclose_in_code_block("But rankings are unchanged")
+                )
+            print("No update")
+
+        if message_to_send:
+            message_to_send = "".join(message_to_send)
+            # print(message_to_send)
+            await channel.send(message_to_send)
+
+    print("Sleeping")
+
+
+@point_rankings_task.before_loop
+async def before_point_rankings():
+    await bot.wait_until_ready()
 
 
 def calc_score(placing):
@@ -104,7 +157,6 @@ def get_player_scores(runs_mini):
         run = runs_mini[run]
         name = run["name"]
         place = run["place"]
-
         if not name in player_scores:
             player_scores[name] = 0
         player_scores[name] += calc_score(place)
@@ -151,61 +203,7 @@ def get_table(player_scores):
 
     return str(t)
 
+point_rankings_task.add_exception_type(JSONDecodeError)
+point_rankings_task.start()
 
-async def my_background_task():
-
-    await client.wait_until_ready()
-    channel = client.get_channel(id=760197170686328842)
-    while True:
-        print("Check Leaderboards @ " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        try:
-            bar_runs = get_all_runs()
-
-            # list of only important data about each run to be scraped and saved
-            runs_mini = get_runs_mini(bar_runs)
-            player_scores = get_player_scores(runs_mini)
-            table = get_table(player_scores)
-
-            # load a json list and convert to a set
-            old_runs_mini = set(json.load(open("runs.json", "r")))
-
-            new_runs_string = get_new_runs_string(runs_mini, old_runs_mini)
-
-            message_to_send = []
-
-            if new_runs_string != None:
-                print("New run(s)")
-                message_to_send.append(enclose_in_code_block(new_runs_string))
-                json.dump(list(runs_mini.keys()), open("runs.json", "w"), indent=2)
-            else:
-                print("No new runs")
-
-            with open("rankings.txt", "r+") as rankings:
-                if table != rankings.read():
-                    print("Point Rankings Update")
-                    message_to_send.append(
-                        enclose_in_code_block("Point Rankings Update!\n" + table)
-                    )
-                    rankings.seek(0)
-                    rankings.truncate()
-                    rankings.write(table)
-                else:
-                    if new_runs_string != None:
-                        message_to_send.append(
-                            enclose_in_code_block("But rankings are unchanged")
-                        )
-                    print("No Update")
-
-                if message_to_send:
-                    message_to_send = "".join(message_to_send)
-                    # print(message_to_send)
-                    await channel.send(message_to_send)
-
-            print("sleeping")
-        except JSONDecodeError as e:
-            print("Unexpected API issue")
-            print(e)
-        await asyncio.sleep(1200)  # task runs every 1200 seconds
-
-
-client.run(TOKEN)
+bot.run(TOKEN)

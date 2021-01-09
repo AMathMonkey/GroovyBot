@@ -30,18 +30,20 @@ async def ilranking(ctx, username: str, category: str):
         username = username.strip().lower()
         track_and_category = track_category_converter(category.strip().lower())
         if not track_and_category:
-            await ctx.send("Invalid command")
+            await ctx.send(enclose_in_code_block("Invalid command"))
             return
 
         track = track_and_category["track"]
         category = track_and_category["category"]
-        print(f"username: {username}, category: {category}")
 
         runs_mini = json.load(open("runs.json", "r"))
         for run in runs_mini.values():
             if run["category"] == category and run["level"] == track and run["name"].lower() == username:
                 message = f"{run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
                 await ctx.send(enclose_in_code_block(message))
+                return
+        await ctx.send(enclose_in_code_block("Not found"))
+        
 
 
 @tasks.loop(minutes=20.0)

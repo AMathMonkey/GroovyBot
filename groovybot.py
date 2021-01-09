@@ -32,17 +32,16 @@ async def point_rankings_task():
 
     # list of only important data about each run
     runs_mini = get_runs_mini(bar_runs)
-    player_scores = get_player_scores(runs_mini)
-    table = get_table(player_scores)
-
     # load a json list and convert to a set
     old_runs_mini = set(json.load(open("runs.json", "r")))
 
+    player_scores = get_player_scores(runs_mini)
+    table = get_table(player_scores)
     new_runs_string = get_new_runs_string(runs_mini, old_runs_mini)
 
     message_to_send = []
 
-    if new_runs_string != None:
+    if new_runs_string:
         print("New run(s)")
         message_to_send.append(enclose_in_code_block(new_runs_string))
         json.dump(list(runs_mini.keys()), open("runs.json", "w"), indent=2)
@@ -183,7 +182,6 @@ def get_new_runs_string(runs_mini, old_runs_mini):
 
 
 def get_table(player_scores):
-
     ranking = sorted(player_scores, key=player_scores.get, reverse=True)
 
     t = PrettyTable(["Pos", "Score", "Name"])

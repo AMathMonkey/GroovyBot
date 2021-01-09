@@ -12,7 +12,7 @@ api = srcomapi.SpeedrunCom()
 api.debug = 0
 game = api.search(srcomapi.datatypes.Game, {"name": "Beetle Adventure Racing"})[0]
 
-GROOVYBOT_CHANNEL_ID = 760197170686328842
+GROOVYBOT_CHANNEL_IDS = [760197170686328842, 797386043024343090]
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -26,7 +26,7 @@ async def on_ready():
 
 @bot.command()
 async def ilranking(ctx, username: str, category: str):
-    if ctx.channel.id == GROOVYBOT_CHANNEL_ID:
+    if ctx.channel.id in GROOVYBOT_CHANNEL_IDS:
         username = username.strip().lower()
         track_and_category = track_category_converter(category.strip().lower())
         if not track_and_category:
@@ -38,19 +38,47 @@ async def ilranking(ctx, username: str, category: str):
 
         runs_mini = json.load(open("runs.json", "r"))
         for run in runs_mini.values():
-            if run["category"] == category and run["level"] == track and run["name"].lower() == username:
+            if (
+                run["category"] == category
+                and run["level"] == track
+                and run["name"].lower() == username
+            ):
                 message = f"{run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
                 await ctx.send(enclose_in_code_block(message))
                 return
         await ctx.send(enclose_in_code_block("Not found"))
-        
+
+
+@bot.command()
+async def longeststanding(ctx):
+    standings = []
+    message_to_send = ["Longest standing runs:\n\n"]
+    if ctx.channel.id in GROOVYBOT_CHANNEL_IDS:
+        now = datetime.now().strftime("%Y-%m-%d")
+        runs_mini = json.load(open("runs.json", "r"))
+
+        for run in runs_mini.values():
+            if run["place"] == 1:
+                run["age"] = days_between(now, run["date"])
+                standings.append(run)
+
+    standings.sort(key=lambda i: i["age"], reverse=True)
+    for run in standings:
+        age = run["age"]
+        s = age == 1
+        message_to_send.append(
+            f"{run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {age} day{'' if s else 's'} old\n"
+        )
+
+    message_to_send = "".join(message_to_send)
+    await ctx.send(enclose_in_code_block(message_to_send))
 
 
 @tasks.loop(minutes=20.0)
 async def point_rankings_task():
     print("Check Leaderboards @ " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-    channel = bot.get_channel(id=GROOVYBOT_CHANNEL_ID)
+    channel = bot.get_channel(id=GROOVYBOT_CHANNEL_IDS[0])
 
     bar_runs = get_all_runs()
 
@@ -187,6 +215,7 @@ def get_runs_mini(bar_runs):
                 name = str(run["run"].players).split('"')[1]
                 time = str(run["run"].times["ingame_t"])
                 place = run["place"]
+                date = run["run"].date
 
                 id_string = category + level + name + time
                 runs_mini[id_string] = {
@@ -195,6 +224,7 @@ def get_runs_mini(bar_runs):
                     "name": name,
                     "time": time_string(time),
                     "place": place,
+                    "date": date,
                 }
     return runs_mini
 
@@ -251,7 +281,14 @@ def get_table(player_scores):
     return str(t)
 
 
+def days_between(d1, d2):
+    d1 = datetime.strptime(d1, "%Y-%m-%d")
+    d2 = datetime.strptime(d2, "%Y-%m-%d")
+    return abs((d2 - d1).days)
+
+
 point_rankings_task.add_exception_type(JSONDecodeError)
 point_rankings_task.start()
+
 
 bot.run(TOKEN)

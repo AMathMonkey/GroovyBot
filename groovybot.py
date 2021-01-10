@@ -52,7 +52,7 @@ async def ilranking(ctx, username: str, category: str):
 @bot.command()
 async def longeststanding(ctx):
     standings = []
-    message_to_send = ["Longest standing runs:\n\n"]
+    message_to_send = ["Longest standing WR runs:\n\n"]
     if ctx.channel.id in GROOVYBOT_CHANNEL_IDS:
         now = datetime.now().strftime("%Y-%m-%d")
         runs_mini = json.load(open("runs.json", "r"))
@@ -65,9 +65,9 @@ async def longeststanding(ctx):
     standings.sort(key=lambda i: i["age"], reverse=True)
     for run in standings:
         age = run["age"]
-        s = age == 1
+        s = age != 1
         message_to_send.append(
-            f"{run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {age} day{'' if s else 's'} old\n"
+            f"{run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {age} day{'s' if s else ''} old\n"
         )
 
     message_to_send = "".join(message_to_send)
@@ -84,7 +84,7 @@ async def point_rankings_task():
 
     # list of only important data about each run
     runs_mini = get_runs_mini(bar_runs)
-    # load a json list and convert to a set
+    # load a json object as a dict of all runs
     old_runs_mini = json.load(open("runs.json"))
 
     player_scores = get_player_scores(runs_mini)

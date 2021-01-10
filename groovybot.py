@@ -12,11 +12,17 @@ api = srcomapi.SpeedrunCom()
 api.debug = 0
 game = api.search(srcomapi.datatypes.Game, {"name": "Beetle Adventure Racing"})[0]
 
-GROOVYBOT_CHANNEL_IDS = [760197170686328842, 797386043024343090]
-
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
+MODE = os.getenv("MODE")
 bot = commands.Bot("!")
+
+if MODE == "PROD":
+    print("Running in production mode")
+    GROOVYBOT_CHANNEL_IDS = [760197170686328842, 797386043024343090]
+else:
+    print("Running in test mode")
+    GROOVYBOT_CHANNEL_IDS = [797386043024343090]
 
 
 @bot.event
@@ -30,7 +36,11 @@ async def ilranking(ctx, username: str, category: str):
         username = username.strip().lower()
         track_and_category = track_category_converter(category.strip().lower())
         if not track_and_category:
-            await ctx.send(enclose_in_code_block("Invalid command"))
+            await ctx.send(
+                enclose_in_code_block(
+                    "Invalid category - please use track initials like cc or MMm100"
+                )
+            )
             return
 
         track = track_and_category["track"]
@@ -46,32 +56,30 @@ async def ilranking(ctx, username: str, category: str):
                 message = f"{run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
                 await ctx.send(enclose_in_code_block(message))
                 return
-        await ctx.send(enclose_in_code_block("Not found"))
+        await ctx.send(enclose_in_code_block("No run matching that username"))
 
 
 @bot.command()
 async def longeststanding(ctx):
-    standings = []
-    message_to_send = ["Longest standing WR runs:\n\n"]
     if ctx.channel.id in GROOVYBOT_CHANNEL_IDS:
+        message_to_send = ["Longest standing WR runs:\n\n"]
         now = datetime.now().strftime("%Y-%m-%d")
         runs_mini = json.load(open("runs.json", "r"))
 
-        for run in runs_mini.values():
-            if run["place"] == 1:
-                run["age"] = days_between(now, run["date"])
-                standings.append(run)
+        wr_runs = [run for run in runs_mini.values() if run["place"] == 1]
+        for run in wr_runs:
+            run["age"] = days_between(now, run["date"])
 
-    standings.sort(key=lambda i: i["age"], reverse=True)
-    for run in standings:
-        age = run["age"]
-        s = age != 1
-        message_to_send.append(
-            f"{run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {age} day{'s' if s else ''} old\n"
-        )
+        wr_runs.sort(key=lambda i: i["age"], reverse=True)
+        for run in wr_runs:
+            age = run["age"]
+            s = age != 1
+            message_to_send.append(
+                f"{run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {age} day{'s' if s else ''} old\n"
+            )
 
-    message_to_send = "".join(message_to_send)
-    await ctx.send(enclose_in_code_block(message_to_send))
+        message_to_send = "".join(message_to_send)
+        await ctx.send(enclose_in_code_block(message_to_send))
 
 
 @tasks.loop(minutes=20.0)
@@ -119,7 +127,6 @@ async def point_rankings_task():
 
         if message_to_send:
             message_to_send = "".join(message_to_send)
-            # print(message_to_send)
             await channel.send(message_to_send)
 
     print("Sleeping")

@@ -10,7 +10,7 @@ from prettytable import PrettyTable
 
 api = srcomapi.SpeedrunCom()
 api.debug = 0
-game = api.search(srcomapi.datatypes.Game, {"name": "Beetle Adventure Racing"})[0]
+game = api.search(dt.Game, {"name": "Beetle Adventure Racing"})[0]
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -294,8 +294,6 @@ def days_between(d1, d2):
     return abs((d2 - d1).days)
 
 
-point_rankings_task.add_exception_type(JSONDecodeError)
 point_rankings_task.start()
-
 
 bot.run(TOKEN)

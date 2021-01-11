@@ -119,7 +119,7 @@ async def point_rankings_task():
             rankings.truncate()
             rankings.write(table)
         else:
-            if new_runs_string != None:
+            if new_runs_string:
                 message_to_send.append(
                     enclose_in_code_block("But rankings are unchanged")
                 )
@@ -224,7 +224,7 @@ def get_runs_mini(bar_runs):
                 place = run["place"]
                 date = run["run"].date
 
-                id_string = category + level + name + time
+                id_string = f"{category} {level} {name} {time}"
                 runs_mini[id_string] = {
                     "category": category,
                     "level": level,
@@ -253,7 +253,7 @@ def get_new_runs_string(runs_mini, old_runs_mini):
 
     for run in runs_mini:  # just looks at the keys of this dict, which are run IDs
         # if this ID isn't in the set of old IDs, run is new
-        if not run in old_runs_mini:
+        if run not in old_runs_mini:
 
             # temporarily convert run from an ID string to the actual run with that ID to simplify next line
             run = runs_mini[run]

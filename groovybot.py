@@ -294,6 +294,7 @@ def days_between(d1, d2):
     return abs((d2 - d1).days)
 
 
+point_rankings_task.add_exception_type(JSONDecodeError)
 point_rankings_task.start()
 
 bot.run(TOKEN)

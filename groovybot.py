@@ -75,7 +75,7 @@ async def longeststanding(ctx):
             age = run["age"]
             s = age != 1
             message_to_send.append(
-                f"{run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {age} day{'s' if s else ''} old\n"
+                f"{run['level']} - {run['category']} in {run['time']} by {run['name']}, {age} day{'s' if s else ''} old\n"
             )
 
         message_to_send = "".join(message_to_send)

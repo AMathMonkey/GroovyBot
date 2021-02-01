@@ -53,7 +53,7 @@ async def ilranking(ctx, username: str, category: str):
                 and run["level"] == track
                 and run["name"].lower() == username
             ):
-                message = f"{run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
+                message = f"{run['level']} - {run['category']} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
                 await ctx.send(enclose_in_code_block(message))
                 return
         await ctx.send(enclose_in_code_block("No run matching that username"))
@@ -123,7 +123,7 @@ async def point_rankings_task():
                 message_to_send.append(
                     enclose_in_code_block("But rankings are unchanged")
                 )
-            print("No update")
+            print("Rankings unchanged")
 
         if message_to_send:
             message_to_send = "".join(message_to_send)
@@ -258,7 +258,7 @@ def get_new_runs_string(runs_mini, old_runs_mini):
             # temporarily convert run from an ID string to the actual run with that ID to simplify next line
             run = runs_mini[run]
             new_runs_string.append(
-                f"New run! {run['level']} - {run['category'].title()} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
+                f"New run! {run['level']} - {run['category']} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
             )
 
     if not new_runs_string:

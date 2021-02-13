@@ -31,55 +31,59 @@ async def on_ready():
 
 
 @bot.command()
-async def ilranking(ctx, username: str, category: str):
-    if ctx.channel.id in GROOVYBOT_CHANNEL_IDS:
-        username = username.strip().lower()
-        track_and_category = track_category_converter(category.strip().lower())
-        if not track_and_category:
-            await ctx.send(
-                enclose_in_code_block(
-                    "Invalid category - please use track initials like cc or MMm100"
-                )
+async def ilranking(ctx, username: str, shortform: str):
+    if ctx.channel.id not in GROOVYBOT_CHANNEL_IDS:
+        return
+
+    username = username.strip().lower()
+    track_and_category = track_category_converter(shortform.strip().lower())
+    if not track_and_category:
+        await ctx.send(
+            enclose_in_code_block(
+                "Invalid category - please use track initials like cc or MMm100"
             )
+        )
+        return
+
+    track = track_and_category["track"]
+    category = track_and_category["category"]
+
+    runs_mini = json.load(open("runs.json"))
+    for run in runs_mini.values():
+        if (
+            run["category"] == category
+            and run["level"] == track
+            and run["name"].lower() == username
+        ):
+            message = f"{run['level']} - {run['category']} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
+            await ctx.send(enclose_in_code_block(message))
             return
-
-        track = track_and_category["track"]
-        category = track_and_category["category"]
-
-        runs_mini = json.load(open("runs.json", "r"))
-        for run in runs_mini.values():
-            if (
-                run["category"] == category
-                and run["level"] == track
-                and run["name"].lower() == username
-            ):
-                message = f"{run['level']} - {run['category']} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
-                await ctx.send(enclose_in_code_block(message))
-                return
-        await ctx.send(enclose_in_code_block("No run matching that username"))
+    await ctx.send(enclose_in_code_block("No run matching that username"))
 
 
 @bot.command()
 async def longeststanding(ctx):
-    if ctx.channel.id in GROOVYBOT_CHANNEL_IDS:
-        message_to_send = ["Longest standing WR runs:\n\n"]
-        now = datetime.now().strftime("%Y-%m-%d")
-        runs_mini = json.load(open("runs.json", "r"))
+    if ctx.channel.id not in GROOVYBOT_CHANNEL_IDS:
+        return
 
-        wr_runs = [run for run in runs_mini.values() if run["place"] == 1]
-        for run in wr_runs:
-            run["age"] = days_between(now, run["date"])
+    message_to_send = ["Longest standing WR runs:\n\n"]
+    now = datetime.now().strftime("%Y-%m-%d")
+    runs_mini = json.load(open("runs.json"))
 
-        wr_runs.sort(key=lambda i: i["age"], reverse=True)
-        for run in wr_runs:
-            age = run["age"]
-            s = age != 1
-            message_to_send.append(
-                f"{run['level']} - {run['category']} in {run['time']} by {run['name']}, {age} day{'s' if s else ''} old\n"
-            )
+    wr_runs = [run for run in runs_mini.values() if run["place"] == 1]
+    for run in wr_runs:
+        run["age"] = days_between(now, run["date"])
 
-        message_to_send = "".join(message_to_send)
-        await ctx.send(enclose_in_code_block(message_to_send))
+    wr_runs.sort(key=lambda i: i["age"], reverse=True)
+    for run in wr_runs:
+        age = run["age"]
+        s = age != 1
+        message_to_send.append(
+            f"{run['level']} - {run['category']} in {run['time']} by {run['name']}, {age} day{'s' if s else ''} old\n"
+        )
+
+    message_to_send = "".join(message_to_send)
+    await ctx.send(enclose_in_code_block(message_to_send))
 
 
 @tasks.loop(minutes=20.0)
@@ -194,7 +198,7 @@ def time_string(time):
 
 
 def enclose_in_code_block(string):
-    return "```\n" + string + "\n```"
+    return f"```\n{string}\n```"
 
 
 def get_all_runs():

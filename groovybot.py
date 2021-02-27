@@ -90,6 +90,18 @@ async def longeststanding(ctx):
     await ctx.send(enclose_in_code_block(message_to_send))
 
 
+@bot.command()
+async def pointrankings(ctx):
+    if ctx.channel.id not in GROOVYBOT_CHANNEL_IDS:
+        return
+
+    runs_mini = json.load(open("runs.json"))
+    player_scores = get_player_scores(runs_mini)
+    table = get_table(player_scores)
+
+    await ctx.send(enclose_in_code_block(table))
+
+
 @tasks.loop(minutes=20.0)
 async def point_rankings_task():
     print("Check Leaderboards @ " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))

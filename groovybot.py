@@ -50,7 +50,7 @@ async def ilranking(ctx, username: str, shortform: str):
     runs_mini = json.load(open("runs.json"))
 
     result = (
-        f"{run['level']} - {run['category']} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
+        f"{run['level']} - {run['category']} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place"
         for run in runs_mini.values()
         if run["category"] == category
         and run["level"] == track
@@ -66,23 +66,26 @@ async def longeststanding(ctx):
     if ctx.channel.id not in GROOVYBOT_CHANNEL_IDS:
         return
 
-    message_to_send = ["Longest standing WR runs:\n\n"]
     now = datetime.now().strftime("%Y-%m-%d")
     runs_mini = json.load(open("runs.json"))
 
-    wr_runs = [run for run in runs_mini.values() if run["place"] == 1]
-    for run in wr_runs:
-        run["age"] = days_between(now, run["date"])
+    wr_runs = sorted(
+        [
+            {**run, "age": days_between(now, run["date"])}
+            for run in runs_mini.values()
+            if run["place"] == 1
+        ],
+        key=lambda i: i["age"],
+        reverse=True,
+    )
 
-    wr_runs.sort(key=lambda i: i["age"], reverse=True)
-    for run in wr_runs:
-        age = run["age"]
-        s = age != 1
-        message_to_send.append(
-            f"{run['level']} - {run['category']} in {run['time']} by {run['name']}, {age} day{'s' if s else ''} old\n"
-        )
+    def string_gen():
+        for run in wr_runs:
+            age = run["age"]
+            s = age != 1
+            yield f"{run['level']} - {run['category']} in {run['time']} by {run['name']}, {age} day{'s' if s else ''} old"
 
-    message_to_send = "".join(message_to_send)
+    message_to_send = "\n".join(["Longest standing WR runs:\n", *string_gen()])
     await ctx.send(enclose_in_code_block(message_to_send))
 
 
@@ -160,7 +163,7 @@ def track_category_converter(shortform: str):
     elif shortform.startswith("ww"):
         track = "Wicked Woods"
     else:
-        return None
+        return {}
 
     return {"category": category, "track": track}
 

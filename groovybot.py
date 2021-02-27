@@ -235,17 +235,13 @@ def get_runs_mini(bar_runs: dict) -> list:
             for level in bar_runs[category]:
                 leaderboard = bar_runs[category][level]
                 for run in leaderboard.runs:
-                    name = str(run["run"].players).split('"')[1]
-                    time = seconds_to_minutes(run["run"].times["ingame_t"])
-                    place = run["place"]
-                    date = run["run"].date
                     yield {
                         "category": category,
                         "level": level,
-                        "name": name,
-                        "time": time,
-                        "place": place,
-                        "date": date,
+                        "name": str(run["run"].players).split('"')[1],
+                        "time": seconds_to_minutes(run["run"].times["ingame_t"]),
+                        "place": run["place"],
+                        "date": run["run"].date,
                     }
 
     return [*run_gen()]

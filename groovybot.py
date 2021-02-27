@@ -205,19 +205,19 @@ def enclose_in_code_block(string):
 
 
 def get_all_runs():
-    bar_runs = {}
-    for category in game.categories:
-        if category.type == "per-level":
-            if not category.name in bar_runs:
-                bar_runs[category.name] = {}
-            for level in game.levels:
-                bar_runs[category.name][level.name] = dt.Leaderboard(
-                    api,
-                    data=api.get(
-                        f"leaderboards/{game.id}/level/{level.id}/{category.id}?embed=variables"
-                    ),
-                )
-    return bar_runs
+    return {
+        category.name: {
+            level.name: dt.Leaderboard(
+                api,
+                data=api.get(
+                    f"leaderboards/{game.id}/level/{level.id}/{category.id}?embed=variables"
+                ),
+            )
+            for level in game.levels
+        }
+        for category in game.categories
+        if category.type == "per-level"
+    }
 
 
 def get_runs_mini(bar_runs):

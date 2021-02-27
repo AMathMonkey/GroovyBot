@@ -51,7 +51,7 @@ async def ilranking(ctx, username: str, shortform: str):
 
     result = (
         f"{run['level']} - {run['category']} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place"
-        for run in runs_mini.values()
+        for run in runs_mini
         if run["category"] == category
         and run["level"] == track
         and run["name"].lower() == username.strip().lower()
@@ -72,7 +72,7 @@ async def longeststanding(ctx):
     wr_runs = sorted(
         [
             {**run, "age": days_between(now, run["date"])}
-            for run in runs_mini.values()
+            for run in runs_mini
             if run["place"] == 1
         ],
         key=lambda i: i["age"],
@@ -103,7 +103,8 @@ async def point_rankings_task():
     old_runs_mini = json.load(open("runs.json"))
 
     player_scores = get_player_scores(runs_mini)
-    table = get_table(player_scores)
+    old_player_scores = json.load(open("player_scores.json"))
+
     new_runs_string = get_new_runs_string(runs_mini, old_runs_mini)
 
     message_to_send = []
@@ -111,30 +112,28 @@ async def point_rankings_task():
     if new_runs_string:
         print("New run(s)")
         message_to_send.append(enclose_in_code_block(new_runs_string))
-
         json.dump(runs_mini, open("runs.json", "w"), indent=2)
     else:
         print("No new runs")
 
-    with open("rankings.txt", "r+") as rankings:
-        if table != rankings.read():
-            print("Point Rankings Update")
-            message_to_send.append(
-                enclose_in_code_block("Point Rankings Update!\n" + table)
-            )
-            rankings.seek(0)
-            rankings.truncate()
+    if player_scores != old_player_scores:
+        table = get_table(player_scores)
+        print("Point Rankings Update")
+        message_to_send.append(
+            enclose_in_code_block(f"Point Rankings Update!\n{table}")
+        )
+        json.dump(player_scores, open("player_scores.json", "w"), indent=2)
+        with open("rankings.txt", "w") as rankings:
             rankings.write(table)
-        else:
-            if new_runs_string:
-                message_to_send.append(
-                    enclose_in_code_block("But rankings are unchanged")
-                )
-            print("Rankings unchanged")
 
-        if message_to_send:
-            message_to_send = "".join(message_to_send)
-            await channel.send(message_to_send)
+    else:
+        if new_runs_string:
+            message_to_send.append(enclose_in_code_block("But rankings are unchanged"))
+        print("Rankings unchanged")
+
+    if message_to_send:
+        message_to_send = "".join(message_to_send)
+        await channel.send(message_to_send)
 
     print("Sleeping")
 
@@ -144,7 +143,15 @@ async def before_point_rankings():
     await bot.wait_until_ready()
 
 
-def track_category_converter(shortform: str):
+def run_in_list(run: dict, runs: list[dict]) -> bool:
+    ignoredattributes = ["place"]
+    filtered_run = {k: v for k, v in run.items() if k not in ignoredattributes}
+    return filtered_run in (
+        {k: v for k, v in run.items() if k not in ignoredattributes} for run in runs
+    )
+
+
+def track_category_converter(shortform: str) -> dict:
     if shortform.endswith("100"):
         category = "100 Points"
     else:
@@ -168,7 +175,7 @@ def track_category_converter(shortform: str):
     return {"category": category, "track": track}
 
 
-def calc_score(placing):
+def calc_score(placing: int) -> int:
     if placing == 1:
         return 100
     if placing == 2:
@@ -176,7 +183,7 @@ def calc_score(placing):
     return max(0, 98 - placing)
 
 
-def make_ordinal(n):
+def make_ordinal(n: int) -> str:
     n = int(n)
     suffix = ["th", "st", "nd", "rd", "th"][min(n % 10, 4)]
     if 11 <= (n % 100) <= 13:
@@ -184,12 +191,14 @@ def make_ordinal(n):
     return str(n) + suffix
 
 
-def time_string(time):
+def seconds_to_minutes(time: float) -> str:
+    timestr = str(time)
+
     minutes = 0
-    if "." in time:
-        seconds, hundredths = time.split(".")
+    if "." in timestr:
+        seconds, hundredths = timestr.split(".")
     else:
-        seconds = time
+        seconds = timestr
         hundredths = "00"
     seconds = int(seconds)
     while seconds >= 60:
@@ -200,11 +209,11 @@ def time_string(time):
     return f"{minutes}:{seconds}.{hundredths}"
 
 
-def enclose_in_code_block(string):
+def enclose_in_code_block(string: str) -> str:
     return f"```\n{string}\n```"
 
 
-def get_all_runs():
+def get_all_runs() -> dict:
     return {
         category.name: {
             level.name: dt.Leaderboard(
@@ -220,61 +229,49 @@ def get_all_runs():
     }
 
 
-def get_runs_mini(bar_runs):
-    runs_mini = {}
-    for category in bar_runs:
-        for level in bar_runs[category]:
-            leaderboard = bar_runs[category][level]
-            for run in leaderboard.runs:
-                name = str(run["run"].players).split('"')[1]
-                time = str(run["run"].times["ingame_t"])
-                place = run["place"]
-                date = run["run"].date
+def get_runs_mini(bar_runs: dict) -> list:
+    def run_gen():
+        for category in bar_runs:
+            for level in bar_runs[category]:
+                leaderboard = bar_runs[category][level]
+                for run in leaderboard.runs:
+                    name = str(run["run"].players).split('"')[1]
+                    time = seconds_to_minutes(run["run"].times["ingame_t"])
+                    place = run["place"]
+                    date = run["run"].date
+                    yield {
+                        "category": category,
+                        "level": level,
+                        "name": name,
+                        "time": time,
+                        "place": place,
+                        "date": date,
+                    }
 
-                id_string = f"{category} {level} {name} {time}"
-                runs_mini[id_string] = {
-                    "category": category,
-                    "level": level,
-                    "name": name,
-                    "time": time_string(time),
-                    "place": place,
-                    "date": date,
-                }
-    return runs_mini
-
-
-def get_player_scores(runs_mini):
-    player_scores = {}
-    for run in runs_mini:
-        run = runs_mini[run]
-        name = run["name"]
-        place = run["place"]
-        if not name in player_scores:
-            player_scores[name] = 0
-        player_scores[name] += calc_score(place)
-    return player_scores
+    return [*run_gen()]
 
 
-def get_new_runs_string(runs_mini, old_runs_mini):
-    new_runs_string = []
-
-    for run in runs_mini:  # just looks at the keys of this dict, which are run IDs
-        # if this ID isn't in the set of old IDs, run is new
-        if run not in old_runs_mini:
-
-            # temporarily convert run from an ID string to the actual run with that ID to simplify next line
-            run = runs_mini[run]
-            new_runs_string.append(
-                f"New run! {run['level']} - {run['category']} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
-            )
-
-    if not new_runs_string:
-        return None
-
-    return "".join(new_runs_string)
+def get_player_scores(runs_mini: list[dict]) -> dict:
+    players = set([run["name"] for run in runs_mini])
+    return {
+        player: sum(
+            [calc_score(run["place"]) for run in runs_mini if run["name"] == player]
+        )
+        for player in players
+    }
 
 
-def get_table(player_scores):
+def get_new_runs_string(runs_mini: list[dict], old_runs_mini: list[dict]) -> str:
+    return "\n".join(
+        (
+            f"New run! {run['level']} - {run['category']} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place"
+            for run in runs_mini
+            if not run_in_list(run, old_runs_mini)
+        )
+    )
+
+
+def get_table(player_scores: dict) -> str:
     ranking = sorted(player_scores, key=player_scores.get, reverse=True)
 
     t = PrettyTable(["Pos", "Score", "Name"])
@@ -295,10 +292,10 @@ def get_table(player_scores):
     return str(t)
 
 
-def days_between(d1, d2):
-    d1 = datetime.strptime(d1, "%Y-%m-%d")
-    d2 = datetime.strptime(d2, "%Y-%m-%d")
-    return abs((d2 - d1).days)
+def days_between(d1: str, d2: str) -> int:
+    dt1 = datetime.strptime(d1, "%Y-%m-%d")
+    dt2 = datetime.strptime(d2, "%Y-%m-%d")
+    return abs((dt2 - dt1).days)
 
 
 point_rankings_task.add_exception_type(JSONDecodeError)

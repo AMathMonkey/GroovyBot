@@ -35,7 +35,6 @@ async def ilranking(ctx, username: str, shortform: str):
     if ctx.channel.id not in GROOVYBOT_CHANNEL_IDS:
         return
 
-    username = username.strip().lower()
     track_and_category = track_category_converter(shortform.strip().lower())
     if not track_and_category:
         await ctx.send(
@@ -49,16 +48,17 @@ async def ilranking(ctx, username: str, shortform: str):
     category = track_and_category["category"]
 
     runs_mini = json.load(open("runs.json"))
-    for run in runs_mini.values():
-        if (
-            run["category"] == category
-            and run["level"] == track
-            and run["name"].lower() == username
-        ):
-            message = f"{run['level']} - {run['category']} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
-            await ctx.send(enclose_in_code_block(message))
-            return
-    await ctx.send(enclose_in_code_block("No run matching that username"))
+
+    result = (
+        f"{run['level']} - {run['category']} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place\n"
+        for run in runs_mini.values()
+        if run["category"] == category
+        and run["level"] == track
+        and run["name"].lower() == username.strip().lower()
+    )
+
+    message = next(result, "No run matching that username")
+    await ctx.send(enclose_in_code_block(message))
 
 
 @bot.command()

@@ -7,6 +7,7 @@ import srcomapi
 import srcomapi.datatypes as dt
 import json
 from prettytable import PrettyTable
+from typing import List, Dict
 
 api = srcomapi.SpeedrunCom()
 api.debug = 0
@@ -143,7 +144,7 @@ async def before_point_rankings():
     await bot.wait_until_ready()
 
 
-def run_in_list(run: dict, runs: list[dict]) -> bool:
+def run_in_list(run: Dict, runs: List[Dict]) -> bool:
     ignoredattributes = ["place"]
     filtered_run = {k: v for k, v in run.items() if k not in ignoredattributes}
     return filtered_run in (
@@ -151,7 +152,7 @@ def run_in_list(run: dict, runs: list[dict]) -> bool:
     )
 
 
-def track_category_converter(shortform: str) -> dict:
+def track_category_converter(shortform: str) -> Dict:
     if shortform.endswith("100"):
         category = "100 Points"
     else:
@@ -213,7 +214,7 @@ def enclose_in_code_block(string: str) -> str:
     return f"```\n{string}\n```"
 
 
-def get_all_runs() -> dict:
+def get_all_runs() -> Dict:
     return {
         category.name: {
             level.name: dt.Leaderboard(
@@ -229,7 +230,7 @@ def get_all_runs() -> dict:
     }
 
 
-def get_runs_mini(bar_runs: dict) -> list:
+def get_runs_mini(bar_runs: Dict) -> List:
     def run_gen():
         for category in bar_runs:
             for level in bar_runs[category]:
@@ -247,7 +248,7 @@ def get_runs_mini(bar_runs: dict) -> list:
     return [*run_gen()]
 
 
-def get_player_scores(runs_mini: list[dict]) -> dict:
+def get_player_scores(runs_mini: List[Dict]) -> Dict:
     players = set([run["name"] for run in runs_mini])
     return {
         player: sum(
@@ -257,7 +258,7 @@ def get_player_scores(runs_mini: list[dict]) -> dict:
     }
 
 
-def get_new_runs_string(runs_mini: list[dict], old_runs_mini: list[dict]) -> str:
+def get_new_runs_string(runs_mini: List[Dict], old_runs_mini: List[Dict]) -> str:
     return "\n".join(
         (
             f"New run! {run['level']} - {run['category']} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place"
@@ -267,7 +268,7 @@ def get_new_runs_string(runs_mini: list[dict], old_runs_mini: list[dict]) -> str
     )
 
 
-def get_table(player_scores: dict) -> str:
+def get_table(player_scores: Dict) -> str:
     ranking = sorted(player_scores, key=player_scores.get, reverse=True)
 
     t = PrettyTable(["Pos", "Score", "Name"])

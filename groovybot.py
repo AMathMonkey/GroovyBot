@@ -5,9 +5,9 @@ from discord.ext import tasks, commands
 import os
 import srcomapi
 import srcomapi.datatypes as dt
-import json
 from prettytable import PrettyTable
 from typing import List, Dict
+from groovybotsetup import conn, QUERIES
 
 api = srcomapi.SpeedrunCom()
 api.debug = 0
@@ -48,17 +48,17 @@ async def ilranking(ctx, username: str, shortform: str):
     track = track_and_category["track"]
     category = track_and_category["category"]
 
-    runs_mini = json.load(open("runs.json"))
+    c = conn.cursor()
+    run = c.execute(
+        QUERIES.get_one_run_for_ilranking,
+        [category, track, username.strip().lower()],
+    ).fetchone()
 
-    result = (
+    message = (
         f"{run['level']} - {run['category']} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place"
-        for run in runs_mini
-        if run["category"] == category
-        and run["level"] == track
-        and run["name"].lower() == username.strip().lower()
+        if run
+        else "No run matching that username"
     )
-
-    message = next(result, "No run matching that username")
     await ctx.send(enclose_in_code_block(message))
 
 
@@ -68,13 +68,12 @@ async def longeststanding(ctx):
         return
 
     now = datetime.now().strftime("%Y-%m-%d")
-    runs_mini = json.load(open("runs.json"))
 
+    c = conn.cursor()
     wr_runs = sorted(
         [
             {**run, "age": days_between(now, run["date"])}
-            for run in runs_mini
-            if run["place"] == 1
+            for run in c.execute(QUERIES.get_wr_runs).fetchall()
         ],
         key=lambda i: i["age"],
         reverse=True,
@@ -95,9 +94,8 @@ async def pointrankings(ctx):
     if ctx.channel.id not in GROOVYBOT_CHANNEL_IDS:
         return
 
-    runs_mini = json.load(open("runs.json"))
-    player_scores = get_player_scores(runs_mini)
-    table = get_table(player_scores)
+    c = conn.cursor()
+    table = c.execute(QUERIES.get_point_rankings).fetchone()["data"]
 
     await ctx.send(enclose_in_code_block(table))
 
@@ -111,33 +109,35 @@ async def point_rankings_task():
     bar_runs = get_all_runs()
 
     # list of only important data about each run
-    runs_mini = get_runs_mini(bar_runs)
-    # load a json object as a dict of all runs
-    old_runs_mini = json.load(open("runs.json"))
+    runs_dict = get_current_runs_dict(bar_runs)
 
-    player_scores = get_player_scores(runs_mini)
-    old_player_scores = json.load(open("player_scores.json"))
+    player_scores = get_player_scores(runs_dict)
 
-    new_runs_string = get_new_runs_string(runs_mini, old_runs_mini)
+    new_runs_string = get_new_runs_string(runs_dict)
 
     message_to_send = []
 
     if new_runs_string:
         print("New run(s)")
         message_to_send.append(enclose_in_code_block(new_runs_string))
-        json.dump(runs_mini, open("runs.json", "w"), indent=2)
+        save_runs(runs_dict)
     else:
         print("No new runs")
 
-    if player_scores != old_player_scores:
+    c = conn.cursor()
+    if player_scores != {
+        row["name"]: row["score"]
+        for row in c.execute("SELECT * FROM scores").fetchall()
+    }:
         table = get_table(player_scores)
         print("Point Rankings Update")
         message_to_send.append(
             enclose_in_code_block(f"Point Rankings Update!\n{table}")
         )
-        json.dump(player_scores, open("player_scores.json", "w"), indent=2)
-        with open("rankings.txt", "w") as rankings:
-            rankings.write(table)
+        save_scores(player_scores)
+
+        c.execute(QUERIES.replace_point_rankings, [table])
+        conn.commit()
 
     else:
         if new_runs_string:
@@ -151,17 +151,33 @@ async def point_rankings_task():
     print("Sleeping")
 
 
+def save_runs(runs_dict):
+    c = conn.cursor()
+    c.execute(QUERIES.delete_all_runs)
+
+    for run in runs_dict:
+        c.execute(
+            QUERIES.insert_run,
+            run,
+        )
+    conn.commit()
+
+
+def save_scores(player_scores: Dict):
+    c = conn.cursor()
+    c.execute(QUERIES.delete_all_scores)
+
+    for name, score in player_scores.items():
+        c.execute(
+            QUERIES.insert_score,
+            [name, score],
+        )
+    conn.commit()
+
+
 @point_rankings_task.before_loop
 async def before_point_rankings():
     await bot.wait_until_ready()
-
-
-def run_in_list(run: Dict, runs: List[Dict]) -> bool:
-    ignoredattributes = ["place"]
-    filtered_run = {k: v for k, v in run.items() if k not in ignoredattributes}
-    return filtered_run in (
-        {k: v for k, v in run.items() if k not in ignoredattributes} for run in runs
-    )
 
 
 def track_category_converter(shortform: str) -> Dict:
@@ -242,7 +258,7 @@ def get_all_runs() -> Dict:
     }
 
 
-def get_runs_mini(bar_runs: Dict) -> List:
+def get_current_runs_dict(bar_runs: Dict):
     def run_gen():
         for category in bar_runs:
             for level in bar_runs[category]:
@@ -257,25 +273,26 @@ def get_runs_mini(bar_runs: Dict) -> List:
                         "date": run["run"].date,
                     }
 
-    return [*run_gen()]
+    return list(run_gen())
 
 
-def get_player_scores(runs_mini: List[Dict]) -> Dict:
-    players = set([run["name"] for run in runs_mini])
+def get_player_scores(runs_list: List[Dict]) -> Dict[str, int]:
+    players = set(run["name"] for run in runs_list)
     return {
         player: sum(
-            [calc_score(run["place"]) for run in runs_mini if run["name"] == player]
+            calc_score(run["place"]) for run in runs_list if run["name"] == player
         )
         for player in players
     }
 
 
-def get_new_runs_string(runs_mini: List[Dict], old_runs_mini: List[Dict]) -> str:
+def get_new_runs_string(runs_list: List[Dict]) -> str:
+    c = conn.cursor()
     return "\n".join(
         (
             f"New run! {run['level']} - {run['category']} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place"
-            for run in runs_mini
-            if not run_in_list(run, old_runs_mini)
+            for run in runs_list
+            if not c.execute(QUERIES.get_one_run_for_new_runs, run).fetchall()
         )
     )
 

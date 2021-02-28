@@ -69,6 +69,8 @@ class QUERIES:
 
     delete_all_scores = "DELETE FROM scores"
 
+    get_number_of_runs_per_player = "SELECT name, count(name) AS c FROM runs GROUP BY name ORDER BY c DESC;"
+
 
 c = conn.cursor()
 c.execute(QUERIES.create_runs)

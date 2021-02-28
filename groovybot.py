@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 from datetime import datetime
 from json.decoder import JSONDecodeError
+from discord import message
 from dotenv import load_dotenv
 from discord.ext import tasks, commands
 import os
@@ -30,6 +31,24 @@ else:
 @bot.event
 async def on_ready():
     print(f"{bot.user.name} has connected to Discord!")
+
+
+@bot.command()
+async def runsperplayer(ctx):
+    if ctx.channel.id not in GROOVYBOT_CHANNEL_IDS:
+        return
+
+    c = conn.cursor()
+    result = c.execute(QUERIES.get_number_of_runs_per_player).fetchall()
+
+    message = "\n".join(
+        [
+            "Number of different IL runs submitted by each player (12 maximum):\n",
+            *[f"{row['name']}: {row['c']}" for row in result],
+        ]
+    )
+
+    await ctx.send(enclose_in_code_block(message))
 
 
 @bot.command()

@@ -34,6 +34,43 @@ async def on_ready():
 
 
 @bot.command()
+async def newestruns(ctx, numruns=None):
+    if ctx.channel.id not in GROOVYBOT_CHANNEL_IDS:
+        return
+
+    invalid_arg = False
+
+    try:
+        numruns = int(numruns)
+        if not 1 <= numruns <= 10:
+            raise ValueError
+    except (ValueError, TypeError):
+        invalid_arg = True
+        numruns = 5
+
+    c = conn.cursor()
+    result = c.execute(QUERIES.get_newest_runs(numruns)).fetchall()
+
+    header = (
+        "Here is the newest run on the board"
+        if numruns == 1
+        else f"Here are the {numruns} newest runs on the board"
+    ) + (" (can show between 1 and 10):\n" if invalid_arg else ":\n")
+
+    message = "\n".join(
+        [
+            header,
+            *[
+                f"{run['level']} - {run['category']} in {run['time']} by {run['name']}, {make_ordinal(run['place'])} place"
+                for run in result
+            ],
+        ]
+    )
+
+    await ctx.send(enclose_in_code_block(message))
+
+
+@bot.command()
 async def runsperplayer(ctx):
     if ctx.channel.id not in GROOVYBOT_CHANNEL_IDS:
         return

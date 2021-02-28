@@ -69,7 +69,12 @@ class QUERIES:
 
     delete_all_scores = "DELETE FROM scores"
 
-    get_number_of_runs_per_player = "SELECT name, count(name) AS c FROM runs GROUP BY name ORDER BY c DESC;"
+    get_number_of_runs_per_player = (
+        "SELECT name, count(name) AS c FROM runs GROUP BY name ORDER BY c DESC;"
+    )
+
+    def get_newest_runs(numruns: int) -> str:
+        return f"SELECT * FROM runs ORDER BY date DESC LIMIT {numruns}"
 
 
 c = conn.cursor()

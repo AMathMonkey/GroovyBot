@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 from datetime import datetime
 from json.decoder import JSONDecodeError
 from dotenv import load_dotenv

@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 from datetime import datetime
 from json.decoder import JSONDecodeError
-from discord import message
 from dotenv import load_dotenv
 from discord.ext import tasks, commands
 import os

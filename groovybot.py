@@ -237,10 +237,7 @@ async def before_point_rankings():
 
 
 def track_category_converter(shortform: str) -> Dict:
-    if shortform.endswith("100"):
-        category = "100 Points"
-    else:
-        category = "Time Attack"
+    category = "100 Points" if shortform.endswith("100") else "Time Attack"
 
     if shortform.startswith("cc"):
         track = "Coventry Cove"
